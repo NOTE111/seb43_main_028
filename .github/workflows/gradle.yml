@@ -70,7 +70,7 @@ jobs:
       run: >
         aws deploy create-deployment --application-name gutter-ball-lay
         --deployment-config-name CodeDeployDefault.AllAtOnce
-        --deployment-group-name gutter-ball-lay-group
+        --deployment-group-name gutter-ball-lay
         --s3-location bucket=$S3_BUCKET_NAME,bundleType=zip,key=seb43_main_028.zip
 
     
