@@ -68,7 +68,7 @@ jobs:
       # CodeDeploy에게 배포 명령을 내립니다.
     - name: Code Deploy
       run: >
-        aws deploy create-deployment --application-name team028_Deploy_Practice
+        aws deploy create-deployment --application-name gutter-ball-lay
         --deployment-config-name CodeDeployDefault.AllAtOnce
         --deployment-group-name gutter-ball-lay-group
         --s3-location bucket=$S3_BUCKET_NAME,bundleType=zip,key=seb43_main_028.zip
