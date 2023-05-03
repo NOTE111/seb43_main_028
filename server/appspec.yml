@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source:  /
-    destination: /home/ubuntu/action
+    destination: /home/ubuntu/seb43_main_028/server
     overwrite: yes
 
 permissions:
