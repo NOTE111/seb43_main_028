@@ -34,6 +34,12 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
+    - name: write AWS S3 Access Key
+      run : echo "AWS_S3_ACCESS_KEY=${{secrets.AWS_S3_ACCESS_KEY}}" >> env.yml
+      working-directory: ./server/src/main/resources
+    - name: write AWS S3 Secret Access Key
+      run : echo "AWS_S3_SECRET_ACCESS_KEY=${{secrets.AWS_S3_SECRET_ACCESS_KEY}}" >> env.yml
+      working-directory: ./server/src/main/resources
     - name: Add permission 
       run: chmod +x gradlew 
     - name: init with Gradle
