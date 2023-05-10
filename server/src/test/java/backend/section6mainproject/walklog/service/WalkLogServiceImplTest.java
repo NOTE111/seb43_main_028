@@ -1,5 +1,6 @@
 package backend.section6mainproject.walklog.service;
 
+import backend.section6mainproject.exception.BusinessLogicException;
 import backend.section6mainproject.member.entity.Member;
 import backend.section6mainproject.member.service.MemberService;
 import backend.section6mainproject.utils.CustomBeanUtils;
@@ -64,12 +65,12 @@ public class WalkLogServiceImplTest {
         patchWalkLog.setWalkLogPublicSetting(WalkLog.WalkLogPublicSetting.PUBLIC);
         patchWalkLog.setWalkLogId(1L);
 
-        given(walkLogRepository.findById(eq(1L))).willReturn(Optional.of(walkLog));
-        given(beanUtils.copyNonNullProperties(Mockito.any(WalkLog.class),Mockito.any(WalkLog.class))).willReturn(Mockito.any(WalkLog.class));
-        given(walkLogRepository.save(Mockito.any(WalkLog.class))).willReturn(eq(patchWalkLog));
+        given(walkLogRepository.findById(Mockito.anyLong())).willReturn(Optional.of(walkLog));
+        given(beanUtils.copyNonNullProperties(Mockito.any(WalkLog.class),Mockito.any(WalkLog.class))).willReturn(new WalkLog());
+        given(walkLogRepository.save(Mockito.any(WalkLog.class))).willReturn(patchWalkLog);
 
         //when
-        WalkLog updatedWalkLog = walkLogService.updateWalkLog(eq(patchWalkLog));
+        WalkLog updatedWalkLog = walkLogService.updateWalkLog(patchWalkLog);
 
         //then
         assertThat(updatedWalkLog).isNotNull();
@@ -103,11 +104,11 @@ public class WalkLogServiceImplTest {
         given(walkLogRepository.findById(1L)).willReturn(Optional.empty());
 
         //when
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        RuntimeException exception = assertThrows(BusinessLogicException.class, () -> {
             walkLogService.updateWalkLog(walkLog);
         });
         //then
-        assertThat(exception.getMessage()).isEqualTo("WalkLog를 찾을 수 없습니다");
+        assertThat(exception.getMessage()).isEqualTo("WalkLog Not Found");
     }
 
     @Test
