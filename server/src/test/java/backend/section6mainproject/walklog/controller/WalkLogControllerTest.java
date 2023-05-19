@@ -14,12 +14,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.annotation.Transactional;
 
 
+import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -104,6 +111,38 @@ public class WalkLogControllerTest {
                 .andExpect(jsonPath("$.message").value(detailResponse.getMessage()))
                 .andExpect(jsonPath("$.walkLogPublicSetting").value(String.valueOf(detailResponse.getWalkLogPublicSetting())));
     }
+
+    @Test
+    void getWalkLogsTest() throws Exception {
+        //given
+        WalkLogControllerDTO.GetFeedRequest getFeedRequest = new WalkLogControllerDTO.GetFeedRequest();
+        getFeedRequest.setPage(1);
+        getFeedRequest.setSize(10);
+        ArrayList<WalkLogServiceDTO.FindFeedOutput> findFeedOutputs = new ArrayList<>();
+        WalkLogServiceDTO.FindFeedOutput findFeedOutput = new WalkLogServiceDTO.FindFeedOutput();
+        findFeedOutputs.add(findFeedOutput);
+        findFeedOutputs.add(findFeedOutput);
+        WalkLogControllerDTO.GetFeedResponse getFeedResponse = new WalkLogControllerDTO.GetFeedResponse();
+        getFeedResponse.setWalkLogId(1L);
+        getFeedResponse.setMessage("안녕하세요");
+        getFeedResponse.setNickname("테스트");
+        given(walkLogMapper.walkLogControllerGetMemberRequestDTOtoWalkLogServiceFindFeedInputDTO(Mockito.any(WalkLogControllerDTO.GetFeedRequest.class)))
+                .willReturn(new WalkLogServiceDTO.FindFeedInput());
+        given(walkLogService.findFeedWalkLogs(Mockito.any(WalkLogServiceDTO.FindFeedInput.class)))
+                .willReturn(new PageImpl<>(findFeedOutputs));
+        given(walkLogMapper.walkLogServiceFindFeedOutputDTOtoWalkLogControllerGetFeedResponseDTO(Mockito.any(WalkLogServiceDTO.FindFeedOutput.class)))
+                .willReturn(getFeedResponse);
+        //when
+        ResultActions perform = mockMvc.perform(
+                get("/walk-logs")
+                        .param("page",String.valueOf(getFeedRequest.getPage()))
+                        .param("size",String.valueOf(getFeedRequest.getSize())));
+        //then
+        perform.andExpect(status().isOk())
+                .andExpect(jsonPath("$.size()").value(findFeedOutputs.size()))
+                .andExpect(jsonPath("$.data[0].walkLogId").value(getFeedResponse.getWalkLogId()))
+                .andExpect(jsonPath("$.data[0].message").value(getFeedResponse.getMessage()));
+    }
     @Test
     void endWalkLogTest() throws Exception {
         //given
@@ -117,9 +156,14 @@ public class WalkLogControllerTest {
         WalkLogControllerDTO.DetailResponse detailResponse = createDetailResponse(walkLog);
         detailResponse.setMessage("안녕하십니깟!");
         detailResponse.setWalkLogPublicSetting(WalkLog.WalkLogPublicSetting.PUBLIC);
-
         //Json 데이터 생성
         String jasonEndWalkLogDTO = objectMapper.writeValueAsString(endPostDTO);
+        FileInputStream inputStream = new FileInputStream("src/test/resources/testImage/" + "test.jpg");
+        MockMultipartFile mapImageFile = new MockMultipartFile(
+                "mapImage", "test.jpg", "jpg", inputStream
+        );
+        MockPart part = new MockPart("endPost", jasonEndWalkLogDTO.getBytes(StandardCharsets.UTF_8));
+        part.getHeaders().setContentType(MediaType.APPLICATION_JSON);
         //walkLogService.updateWalkLog메서드 로직 Mock수행
         given(walkLogMapper.walkLogControllerEndPostDTOtoWalkLogServiceExitInputDTO(Mockito.any(WalkLogControllerDTO.EndPost.class))).
                 willReturn(new WalkLogServiceDTO.ExitInput());
@@ -127,11 +171,10 @@ public class WalkLogControllerTest {
         given(walkLogMapper.walkLogServiceOutputDTOtoWalkLogControllerDetailResponseDTO(Mockito.any(WalkLogServiceDTO.Output.class))).willReturn(detailResponse);
         //when
         //patchWalkLog메서드를 수행 했을 때
-        ResultActions perform = mockMvc.perform(
-                post("/walk-logs/" + walkLog.getWalkLogId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON)
-                        .content(jasonEndWalkLogDTO));
+        ResultActions perform = mockMvc.perform(MockMvcRequestBuilders.multipart(HttpMethod.POST,"/walk-logs/{walk-log-id}", walkLog.getWalkLogId())
+                        .file(mapImageFile)
+                        .part(part)
+                );
 
         //then
         perform

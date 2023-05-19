@@ -4,6 +4,7 @@ import backend.section6mainproject.content.dto.WalkLogContentServiceDTO;
 import backend.section6mainproject.coordinate.dto.CoordinateServiceDTO;
 import backend.section6mainproject.walklog.entity.WalkLog;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,11 +40,13 @@ public class WalkLogServiceDTO {
         private Long walkLogId;
         private String message;
         private WalkLog.WalkLogPublicSetting walkLogPublicSetting;
+        private MultipartFile mapImage;
+
     }
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class FindsInput {
+    public static class FindInput {
         private Long memberId;
         private Integer page;
         private Integer size;
@@ -54,7 +57,29 @@ public class WalkLogServiceDTO {
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class CalenderFindsInput {
+    public static class FindFeedInput {
+        private Integer page;
+        private Integer size;
+    }
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class FindFeedOutput {
+        private Long walkLogId;
+        private String mapImage;
+        private String nickname;
+        private String profileImage;
+        private LocalDateTime startedAt;
+        private LocalDateTime endAt;
+        private String message;
+        private List<WalkLogContentServiceDTO.Output> walkLogContents;
+
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class CalenderFindInput {
         private Long memberId;
         private int year;
         private int month;
@@ -63,7 +88,7 @@ public class WalkLogServiceDTO {
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class CalenderFindsOutput {
+    public static class CalenderFindOutput {
         private Long walkLogId;
         private LocalDateTime createdAt;
 
@@ -71,9 +96,9 @@ public class WalkLogServiceDTO {
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class FindsOutput {
+    public static class FindOutput {
         private Long walkLogId;
-        private String mapImage; // 구현예정
+        private String mapImage;
         private LocalDateTime startedAt;
         private LocalDateTime endAt;
         private String message;
@@ -90,6 +115,7 @@ public class WalkLogServiceDTO {
         private Long walkLogId;
         private LocalDateTime createdAt;
         private LocalDateTime endAt;
+        private String imageUrl;
 
         private String message;
         private Long memberId;

@@ -1,11 +1,15 @@
 package backend.section6mainproject.walklog.service;
 
+import backend.section6mainproject.content.entity.WalkLogContent;
+import backend.section6mainproject.content.repository.WalkLogContentRepository;
 import backend.section6mainproject.dto.PageInfo;
 import backend.section6mainproject.exception.BusinessLogicException;
 import backend.section6mainproject.exception.ExceptionCode;
+import backend.section6mainproject.helper.image.StorageService;
 import backend.section6mainproject.member.entity.Member;
 import backend.section6mainproject.member.service.MemberService;
 import backend.section6mainproject.utils.CustomBeanUtils;
+import backend.section6mainproject.walklog.dto.WalkLogControllerDTO;
 import backend.section6mainproject.walklog.dto.WalkLogServiceDTO;
 import backend.section6mainproject.walklog.entity.WalkLog;
 import backend.section6mainproject.walklog.mapper.WalkLogMapper;
@@ -25,9 +29,11 @@ import java.util.Optional;
 public class WalkLogServiceImpl implements WalkLogService {
 
     private final WalkLogRepository walkLogRepository;
+    private final WalkLogContentRepository walkLogContentRepository;
     private final MemberService memberService;
     private final CustomBeanUtils<WalkLog> beanUtils;
     private final WalkLogMapper walkLogMapper;
+    private final StorageService storageService;
     private final int FIRST_PAGE_SETTING= 1;
 
     @Override
@@ -36,6 +42,7 @@ public class WalkLogServiceImpl implements WalkLogService {
         checkWalkLogRecording(findmember);
         WalkLog walkLog = new WalkLog();
         walkLog.setMember(findmember);
+        walkLog.setWalkLogStatus(WalkLog.WalkLogStatus.RECORDING);
         return walkLogMapper.walkLogToWalkLogServiceCreatedOutputDTO(walkLogRepository.save(walkLog));
     }
 
@@ -66,16 +73,39 @@ public class WalkLogServiceImpl implements WalkLogService {
     public WalkLogServiceDTO.Output exitWalkLog(WalkLogServiceDTO.ExitInput exitInput){
         WalkLog findWalkLog = findVerifiedWalkLog(exitInput.getWalkLogId());
         checkWalkLogStatusRecording(findWalkLog);
-        WalkLog exitedWalkLog = updateWalkLogExitSetting(beanUtils.copyNonNullProperties(walkLogMapper.walkLogServiceExitInputDTOtoWalkLog(exitInput), findWalkLog));
+        //WalkLogContent들을 조회
+        //만약 walkLogContrent들이 존재하면 리스트들을 돌면서 가장 첫번째 파일의 이미지 url주소를 mapImage에 반환
+
+        WalkLog walkLog = walkLogMapper.walkLogServiceExitInputDTOtoWalkLog(exitInput);
+        WalkLog exitedWalkLog =
+                beanUtils.copyNonNullProperties(walkLog, findWalkLog);
+        updateWalkLogExitSetting(getMapImage(exitInput), exitedWalkLog);
 
         return walkLogMapper.walkLogToWalkLogServiceOutputDTO(exitedWalkLog);
     }
 
-    private WalkLog updateWalkLogExitSetting(WalkLog updatedWalkLog) {
-        updatedWalkLog.setEndAt(LocalDateTime.now());
-        updatedWalkLog.setWalkLogStatus(WalkLog.WalkLogStatus.STOP);
-        return walkLogRepository.save(updatedWalkLog);
+    private String getMapImage(WalkLogServiceDTO.ExitInput exitInput) {
+        String mapImage = "";
+        List<WalkLogContent> walkLogContents =
+                walkLogContentRepository.findAllByWalkLog_WalkLogId(exitInput.getWalkLogId());
+        if(!walkLogContents.isEmpty()) {
+            WalkLogContent walkLogContent = walkLogContents.stream()
+                    .filter(content -> content.getImageKey() != null)
+                    .findFirst()
+                    .orElse(new WalkLogContent());
+            if(walkLogContent.getImageKey() != null) mapImage = walkLogContent.getImageKey();
+                    else mapImage = storageService.store(exitInput.getMapImage(), "mapImage");
+        }
+        return mapImage;
     }
+
+    private void updateWalkLogExitSetting(String mapImage, WalkLog exitedWalkLog) {
+        exitedWalkLog.setEndAt(LocalDateTime.now());
+        exitedWalkLog.setWalkLogStatus(WalkLog.WalkLogStatus.STOP);
+        exitedWalkLog.setMapImage(mapImage);
+        walkLogRepository.save(exitedWalkLog);
+    }
+
 
     private static void checkWalkLogStatusRecording(WalkLog findWalkLog) {
         if(!findWalkLog.getWalkLogStatus().equals(WalkLog.WalkLogStatus.RECORDING))
@@ -90,40 +120,40 @@ public class WalkLogServiceImpl implements WalkLogService {
 
 
     @Override
-    public List<WalkLogServiceDTO.CalenderFindsOutput> findMyMonthWalkLogs(WalkLogServiceDTO.CalenderFindsInput totalFindsInput){
+    public List<WalkLogServiceDTO.CalenderFindOutput> findMyMonthWalkLogs(WalkLogServiceDTO.CalenderFindInput totalFindsInput){
         List<WalkLog> myWalkLogFromMonthForCalendar =
                 walkLogRepository.findMyWalkLogFromMonthForCalendar(totalFindsInput.getMemberId(), totalFindsInput.getYear(), totalFindsInput.getMonth());
-        return walkLogMapper.walkLogsToWalkLogServiceCalenderFindsOutputDTOs(myWalkLogFromMonthForCalendar);
+        return walkLogMapper.walkLogsToWalkLogServiceCalenderFindOutputDTOs(myWalkLogFromMonthForCalendar);
     }
 
     @Override
-    public PageInfo createPageInfo(Page<WalkLogServiceDTO.FindsOutput> findsOutputs) {
+    public PageInfo createPageInfo(Page<WalkLogServiceDTO.FindOutput> findsOutputs) {
         return new PageInfo(findsOutputs.getNumber() + 1,
                 findsOutputs.getSize(), findsOutputs.getTotalElements(), findsOutputs.getTotalPages());
     }
 
     @Override
-    public Page<WalkLogServiceDTO.FindsOutput> findMyWalkLogs(WalkLogServiceDTO.FindsInput findsInput){//년월일 int타입으로 나눠서 리팩토링하기
-        Long memberId = findsInput.getMemberId();
-        Integer year = findsInput.getYear();
-        Integer month = findsInput.getMonth();
-        Integer day = findsInput.getDay();
+    public Page<WalkLogServiceDTO.FindOutput> findMyWalkLogs(WalkLogServiceDTO.FindInput findInput){//년월일 int타입으로 나눠서 리팩토링하기
+        Long memberId = findInput.getMemberId();
+        Integer year = findInput.getYear();
+        Integer month = findInput.getMonth();
+        Integer day = findInput.getDay();
         PageRequest pageRequest =
-                PageRequest.of(findsInput.getPage()-FIRST_PAGE_SETTING,findsInput.getSize(),Sort.by("walkLogId").descending());
+                PageRequest.of(findInput.getPage()-FIRST_PAGE_SETTING, findInput.getSize(),Sort.by("walkLogId").descending());
         memberService.findVerifiedMember(memberId);
         checkInputError(year, month, day);
         if(year == null)
             return walkLogRepository.findAllByMember_MemberId(pageRequest, memberId)
-                            .map(walkLogMapper::walkLogToWalkLogServiceFindsOutputDTO);
+                            .map(walkLogMapper::walkLogToWalkLogServiceFindOutputDTO);
         else if (month == null)
             return walkLogRepository.findAllByMyWalkLogFromYear(pageRequest,memberId,year)
-                    .map(walkLogMapper::walkLogToWalkLogServiceFindsOutputDTO);
+                    .map(walkLogMapper::walkLogToWalkLogServiceFindOutputDTO);
         else if (day == null)
             return walkLogRepository.findMyWalkLogFromMonth(pageRequest,memberId, year, month)
-                    .map(walkLogMapper::walkLogToWalkLogServiceFindsOutputDTO);
+                    .map(walkLogMapper::walkLogToWalkLogServiceFindOutputDTO);
         else
             return walkLogRepository.findAllByMyWalkLogFromDay(pageRequest,memberId, year, month, day)
-                    .map(walkLogMapper::walkLogToWalkLogServiceFindsOutputDTO);
+                    .map(walkLogMapper::walkLogToWalkLogServiceFindOutputDTO);
     }
 
     private static void checkInputError(Integer year, Integer month, Integer day) {
@@ -137,7 +167,12 @@ public class WalkLogServiceImpl implements WalkLogService {
                 throw new BusinessLogicException(ExceptionCode.WRONG_DAY_INPUT);
         }
     }
-
+    @Override
+    public Page<WalkLogServiceDTO.FindFeedOutput> findFeedWalkLogs(WalkLogServiceDTO.FindFeedInput findFeedInput){
+        PageRequest pageRequest = PageRequest.of(findFeedInput.getPage() - 1, findFeedInput.getSize(),Sort.by("walkLogId").descending());
+        return walkLogRepository.findAllByWalkLogPublicSetting(pageRequest, WalkLog.WalkLogPublicSetting.PUBLIC)
+                .map(walkLogMapper::walkLogToWalkLogServiceFindFeedOutputDTO);
+    }
     @Override
     public void deleteWalkLog(Long walkLogId){
         WalkLog findWalkLog = findVerifiedWalkLog(walkLogId);

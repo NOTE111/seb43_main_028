@@ -58,7 +58,7 @@ public class WalkLogControllerDTO {
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class GetRequests {
+    public static class GetMemberRequest {
         @NotNull
         @Positive
         private int page;
@@ -67,13 +67,38 @@ public class WalkLogControllerDTO {
         private Integer month;
         private Integer year;
 
+
     }
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class GetCalendarRequests {
+    public static class GetFeedRequest {
         @NotNull
-        @Min(value = 2023)
+        @Positive
+        private int page;
+        private Integer size = 10;
+
+    }
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GetFeedResponse {
+        private Long walkLogId;
+        private String mapImage;
+        private String nickname;
+        private String profileImage;
+        private LocalDateTime startedAt;
+        private LocalDateTime endAt;
+        private String message;
+        private List<WalkLogContentServiceDTO.Output> walkLogContents;
+
+    }
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GetCalendarRequest {
+        @NotNull
+//        @Min(value = 2023)
         private Integer year;
         @NotNull
         @Range(min = 1, max = 12)
@@ -89,6 +114,18 @@ public class WalkLogControllerDTO {
 
     }
 
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class Response {
+        private Long walkLogId;
+        private String mapImage;
+        private LocalDateTime startedAt;
+        private LocalDateTime endAt;
+        private String message;
+        private List<WalkLogContentServiceDTO.Output> walkLogContents;
+
+    }
 
     @Getter
     @Setter
@@ -98,6 +135,7 @@ public class WalkLogControllerDTO {
         private Long walkLogId;
         private LocalDateTime createdAt;
         private LocalDateTime endAt;
+        private String mapImage;
         @Size(max = 100)
         private String message;
         private Long memberId;

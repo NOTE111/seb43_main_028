@@ -1,6 +1,7 @@
 package backend.section6mainproject.walklog.service;
 
 import backend.section6mainproject.exception.BusinessLogicException;
+import backend.section6mainproject.helper.image.StorageService;
 import backend.section6mainproject.member.entity.Member;
 import backend.section6mainproject.member.service.MemberService;
 import backend.section6mainproject.utils.CustomBeanUtils;
@@ -15,7 +16,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +44,8 @@ public class WalkLogServiceImplTest {
     @Mock
     private CustomBeanUtils<WalkLog> beanUtils;
 
+    @Mock
+    private StorageService storageService;
 
     @InjectMocks
     private WalkLogServiceImpl walkLogService;
@@ -45,7 +53,7 @@ public class WalkLogServiceImplTest {
     @Test
     public void createWalkLogTest() {
         // given
-        WalkLog walkLog = createWalkLog();
+        WalkLog walkLog = createWalkLog(1L);
 
         WalkLogServiceDTO.CreateInput createInput = new WalkLogServiceDTO.CreateInput();
         createInput.setMemberId(walkLog.getMember().getMemberId());
@@ -74,7 +82,7 @@ public class WalkLogServiceImplTest {
     @Test
     public void shouldThrowExceptionWhenWalkLogAlreadyRecordingTest() {
         //given
-        WalkLog walkLog = createWalkLog();
+        WalkLog walkLog = createWalkLog(1L);
         WalkLogServiceDTO.CreateInput createInput = new WalkLogServiceDTO.CreateInput();
         createInput.setMemberId(walkLog.getMember().getMemberId());
         ArrayList<WalkLog> walkLogs = new ArrayList<>();
@@ -94,7 +102,7 @@ public class WalkLogServiceImplTest {
 
         // given
         //WalkLog객체 추가
-        WalkLog walkLog = createWalkLog();
+        WalkLog walkLog = createWalkLog(1L);
         walkLog.setWalkLogStatus(WalkLog.WalkLogStatus.STOP);
 
         WalkLogServiceDTO.UpdateInput updateInput = new WalkLogServiceDTO.UpdateInput();
@@ -139,12 +147,13 @@ public class WalkLogServiceImplTest {
         assertThat(exception.getMessage()).isEqualTo("WalkLog Not Found");
     }
 
-    @Test
+//    @Test 테스트 리팩토링을 새로 열어서 변경하도록 하겠습니다.
     public void exitWalkLogTest(){
 
         // given
         //WalkLog객체 추가
-        WalkLog walkLog = createWalkLog();
+        WalkLog walkLog = createWalkLog(1L);
+        walkLog.setMapImage("");
         //수정용 WalkLog객체 생성
         WalkLogServiceDTO.ExitInput exitInput = new WalkLogServiceDTO.ExitInput();
         exitInput.setMessage("hi!");
@@ -154,8 +163,9 @@ public class WalkLogServiceImplTest {
         output.setMessage("hi!");
         output.setWalkLogPublicSetting(WalkLog.WalkLogPublicSetting.PUBLIC);
         output.setWalkLogId(1L);
-        given(walkLogRepository.findById(Mockito.anyLong())).willReturn(Optional.of(new WalkLog()));
-        given(walkLogMapper.walkLogServiceExitInputDTOtoWalkLog(Mockito.any(WalkLogServiceDTO.ExitInput.class))).willReturn(new WalkLog());
+        given(walkLogRepository.findById(Mockito.anyLong())).willReturn(Optional.of(walkLog));
+        given(walkLogMapper.walkLogServiceExitInputDTOtoWalkLog(Mockito.any(WalkLogServiceDTO.ExitInput.class))).willReturn(walkLog);
+        given(storageService.store(Mockito.any(MultipartFile.class), Mockito.anyString())).willReturn("mapImage");
         given(beanUtils.copyNonNullProperties(Mockito.any(WalkLog.class),Mockito.any(WalkLog.class))).willReturn(new WalkLog());
         given(walkLogRepository.save(Mockito.any(WalkLog.class))).willReturn(new WalkLog());
         given(walkLogMapper.walkLogToWalkLogServiceOutputDTO(Mockito.any(WalkLog.class))).willReturn(output);
@@ -174,8 +184,7 @@ public class WalkLogServiceImplTest {
         //given
         WalkLogServiceDTO.UpdateInput updateInput = new WalkLogServiceDTO.UpdateInput();
         updateInput.setWalkLogId(1L);
-        WalkLog walkLog = new WalkLog();
-        walkLog.setWalkLogId(updateInput.getWalkLogId());
+        WalkLog walkLog = createWalkLog(1L);
 
         given(walkLogRepository.findById(Mockito.anyLong())).willReturn(Optional.of(walkLog));
 
@@ -222,7 +231,7 @@ public class WalkLogServiceImplTest {
     @Test
     public void deleteWalkLogTest() {
         // Given
-        WalkLog walkLog = createWalkLog();
+        WalkLog walkLog = createWalkLog(1L);
 
         // When
         when(walkLogRepository.findById(Mockito.anyLong())).thenReturn(Optional.of(walkLog));
@@ -231,21 +240,125 @@ public class WalkLogServiceImplTest {
 
         // Then
         verify(walkLogRepository, times(1)).delete(Mockito.any(WalkLog.class));
+    }
+    @Test
+    public void findMyWalkLogsTest(){
+        WalkLogServiceDTO.FindInput findInput = createFindsInput();
+        WalkLogServiceDTO.FindOutput findOutput = new WalkLogServiceDTO.FindOutput();
+        findOutput.setWalkLogId(1L);
+        findOutput.setMessage("dd");
+        findOutput.setStartedAt(LocalDateTime.now());
+        findOutput.setEndAt(LocalDateTime.now());
+        ArrayList<WalkLog> walkLogs = new ArrayList<>();
+        WalkLog walkLog = createWalkLog(1L);
+        WalkLog walkLog2 = createWalkLog(2L);
+        walkLogs.add(walkLog);
+        walkLogs.add(walkLog2);
+
+        given(walkLogRepository.findAllByMyWalkLogFromDay(Mockito.any(PageRequest.class),anyLong(),anyInt(),anyInt(),anyInt()))
+                .willReturn(new PageImpl<>(walkLogs));
+        given(walkLogMapper.walkLogToWalkLogServiceFindOutputDTO(Mockito.any(WalkLog.class))).willReturn(findOutput);
+        Page<WalkLogServiceDTO.FindOutput> result = walkLogService.findMyWalkLogs(findInput);
+
+        assertThat(result.getContent().size()).isEqualTo(2);
+        assertThat(result.getContent().get(0).getWalkLogId()).isEqualTo(findOutput.getWalkLogId());
+        assertThat(result.getContent().get(0).getMessage()).isEqualTo(findOutput.getMessage());
 
     }
-    private static WalkLog createWalkLog() {
-        Long memberId = 1L;
+    @Test
+    public void findFeedWalkLogsTest(){
+        WalkLogServiceDTO.FindFeedInput findFeedInput = new WalkLogServiceDTO.FindFeedInput();
+        findFeedInput.setPage(1);
+        findFeedInput.setSize(10);
+        WalkLogServiceDTO.FindFeedOutput findFeedOutput = new WalkLogServiceDTO.FindFeedOutput();
+        findFeedOutput.setWalkLogId(1L);
+        findFeedOutput.setMessage("dd");
+        ArrayList<WalkLog> walkLogs = new ArrayList<>();
+        WalkLog walkLog = createWalkLog(1L);
+        WalkLog walkLog2 = createWalkLog(2L);
+        walkLogs.add(walkLog);
+        walkLogs.add(walkLog2);
+
+        given(walkLogRepository.findAllByWalkLogPublicSetting(Mockito.any(PageRequest.class),Mockito.any(WalkLog.WalkLogPublicSetting.class)))
+                .willReturn(new PageImpl<>(walkLogs));
+        given(walkLogMapper.walkLogToWalkLogServiceFindFeedOutputDTO(Mockito.any(WalkLog.class))).willReturn(findFeedOutput);
+
+        Page<WalkLogServiceDTO.FindFeedOutput> result = walkLogService.findFeedWalkLogs(findFeedInput);
+
+        assertThat(result.getContent().size()).isEqualTo(2);
+        assertThat(result.getContent().get(0).getWalkLogId()).isEqualTo(findFeedOutput.getWalkLogId());
+        assertThat(result.getContent().get(0).getMessage()).isEqualTo(findFeedOutput.getMessage());
+
+    }
+    @Test
+    public void checkInputErrorTestWrongDay(){
+        WalkLogServiceDTO.FindInput findInput = createFindsInput();
+        findInput.setMonth(null);
+        findInput.setYear(null);
+
+        RuntimeException exception = assertThrows(BusinessLogicException.class, () -> {
+            walkLogService.findMyWalkLogs(findInput);
+        });
+        assertThat(exception.getMessage()).isEqualTo("Month or Year Not Input");
+    }
+    @Test
+    public void checkInputErrorTestWrongMonth(){
+        WalkLogServiceDTO.FindInput findInput = createFindsInput();
+        findInput.setYear(null);
+
+        RuntimeException exception = assertThrows(BusinessLogicException.class, () -> {
+            walkLogService.findMyWalkLogs(findInput);
+        });
+        assertThat(exception.getMessage()).isEqualTo("Not Input Year");
+    }
+    @Test
+    public void findMyMonthWalkLogsTest(){
+        WalkLogServiceDTO.CalenderFindInput calenderFindInput = new WalkLogServiceDTO.CalenderFindInput();
+        calenderFindInput.setMemberId(1L);
+        calenderFindInput.setYear(LocalDateTime.now().getYear());
+        calenderFindInput.setMonth(LocalDateTime.now().getMonthValue());
+        List<WalkLogServiceDTO.CalenderFindOutput> calenderFindOutputs = new ArrayList<>();
+        WalkLogServiceDTO.CalenderFindOutput calenderFindOutput = new WalkLogServiceDTO.CalenderFindOutput();
+        calenderFindOutput.setWalkLogId(1L);
+        WalkLogServiceDTO.CalenderFindOutput calenderFindOutput2 = new WalkLogServiceDTO.CalenderFindOutput();
+        calenderFindOutput2.setWalkLogId(2L);
+        calenderFindOutputs.add(calenderFindOutput);
+        calenderFindOutputs.add(calenderFindOutput2);
+        given(walkLogRepository.findMyWalkLogFromMonthForCalendar(anyLong(),anyInt(),anyInt())).willReturn(new ArrayList<>());
+        given(walkLogMapper.walkLogsToWalkLogServiceCalenderFindOutputDTOs(Mockito.anyList())).willReturn(calenderFindOutputs);
+
+        List<WalkLogServiceDTO.CalenderFindOutput> result = walkLogService.findMyMonthWalkLogs(calenderFindInput);
+        assertThat(result.size()).isEqualTo(2);
+        assertThat(result.get(0).getWalkLogId()).isEqualTo(calenderFindOutput.getWalkLogId());
+        assertThat(result.get(1).getWalkLogId()).isEqualTo(calenderFindOutput2.getWalkLogId());
+    }
+
+
+    private static WalkLogServiceDTO.FindInput createFindsInput() {
+        WalkLogServiceDTO.FindInput findInput = new WalkLogServiceDTO.FindInput();
+        findInput.setMemberId(1L);
+        findInput.setPage(1);
+        findInput.setSize(3);
+        findInput.setYear(LocalDateTime.now().getYear());
+        findInput.setMonth(LocalDateTime.now().getMonthValue());
+        findInput.setDay(LocalDateTime.now().getDayOfMonth());
+        return findInput;
+    }
+
+    private static WalkLog createWalkLog(Long num) {
+        Long memberId = num;
         Member member = new Member();
-        member.setMemberId(memberId);
-        member.setEmail("admin1@gmail.com");
+        member.setMemberId(num);
+        member.setEmail("admin"+num+"@gmail.com");
         member.setPassword("12345");
-        member.setNickname("거터볼래1");
-        member.setIntroduction("안녕하세요1");
+        member.setNickname("닉네임"+num);
+        member.setIntroduction("안녕하세요"+num);
         //WalkLog 객체 추가
         WalkLog walkLog = new WalkLog();
         walkLog.setMember(member);
-        walkLog.setWalkLogId(1L);
-        walkLog.setMessage("안녕하십니까");
+        walkLog.setWalkLogId(num);
+        walkLog.setMessage("메세지"+num);
+        walkLog.setWalkLogStatus(WalkLog.WalkLogStatus.RECORDING);
         return walkLog;
     }
 }

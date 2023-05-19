@@ -1,7 +1,6 @@
 package backend.section6mainproject.walklog.controller;
 
 import backend.section6mainproject.dto.MultiResponseDto;
-import backend.section6mainproject.dto.PageInfo;
 import backend.section6mainproject.walklog.dto.WalkLogControllerDTO;
 import backend.section6mainproject.walklog.dto.WalkLogServiceDTO;
 import backend.section6mainproject.walklog.mapper.WalkLogMapper;
@@ -10,14 +9,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.validation.Valid;
 import javax.validation.constraints.Positive;
 import java.net.URI;
-import java.util.List;
 
 @RestController
 @RequestMapping("/walk-logs")
@@ -30,8 +30,8 @@ public class WalkLogController {
     private final WalkLogService walkLogService;
     private final WalkLogMapper walkLogMapper;
     @PostMapping
-    public ResponseEntity postWalkLog(@Valid @RequestBody WalkLogControllerDTO.Post walkLogControllerPostDto){
-        WalkLogServiceDTO.CreateInput createInput = walkLogMapper.walkLogControllerPostDTOtoWalkLogServiceCreateInputDTO(walkLogControllerPostDto);
+    public ResponseEntity postWalkLog(@Valid @RequestBody WalkLogControllerDTO.Post post){
+        WalkLogServiceDTO.CreateInput createInput = walkLogMapper.walkLogControllerPostDTOtoWalkLogServiceCreateInputDTO(post);
         WalkLogServiceDTO.CreateOutput createOutput = walkLogService.createWalkLog(createInput);
         WalkLogControllerDTO.PostResponse postResponse = walkLogMapper.walkLogServiceCreateOutPutDTOtoWalkLogControllerPostResponseDTO(createOutput);
         Long walkLogId = postResponse.getWalkLogId();
@@ -44,22 +44,23 @@ public class WalkLogController {
     }
     @PatchMapping("/{walk-log-id}")
     public ResponseEntity patchWalkLog(@PathVariable("walk-log-id") @Positive long walkLogId,
-                                       @Valid @RequestBody WalkLogControllerDTO.Patch walkLogControllerPatchDto){
+                                       @Valid @RequestBody WalkLogControllerDTO.Patch patch){
 
-        WalkLogServiceDTO.UpdateInput updateInput = walkLogMapper.walkLogControllerPatchDTOtoWalkLogServiceUpdateInputDTO(walkLogControllerPatchDto);
+        WalkLogServiceDTO.UpdateInput updateInput = walkLogMapper.walkLogControllerPatchDTOtoWalkLogServiceUpdateInputDTO(patch);
         updateInput.setWalkLogId(walkLogId);
         WalkLogControllerDTO.DetailResponse detailResponse =
                 walkLogMapper.walkLogServiceOutputDTOtoWalkLogControllerDetailResponseDTO(walkLogService.updateWalkLog(updateInput));
         return new ResponseEntity<>(detailResponse, HttpStatus.OK);
     }
 
-    @PostMapping("/{walk-log-id}")
+    @PostMapping(path = "/{walk-log-id}", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity endWalkLog(@PathVariable("walk-log-id") @Positive Long walkLogId,
-                                     @Valid @RequestBody WalkLogControllerDTO.EndPost walkLogEndPostDTO){
-        //현재 걷기 도중인
-        //멤버 인증 로직은 추후에 반영
-        WalkLogServiceDTO.ExitInput exitInput = walkLogMapper.walkLogControllerEndPostDTOtoWalkLogServiceExitInputDTO(walkLogEndPostDTO);
+                                     @Valid @RequestPart WalkLogControllerDTO.EndPost endPost,
+                                     @RequestPart MultipartFile mapImage){
+        WalkLogServiceDTO.ExitInput exitInput =
+                walkLogMapper.walkLogControllerEndPostDTOtoWalkLogServiceExitInputDTO(endPost);
         exitInput.setWalkLogId(walkLogId);
+        exitInput.setMapImage(mapImage);
         WalkLogServiceDTO.Output output = walkLogService.exitWalkLog(exitInput);
 
         return new ResponseEntity(walkLogMapper.walkLogServiceOutputDTOtoWalkLogControllerDetailResponseDTO(output),HttpStatus.OK);
@@ -71,6 +72,14 @@ public class WalkLogController {
                 walkLogMapper.walkLogServiceOutputDTOtoWalkLogControllerDetailResponseDTO(walkLogService.findWalkLog(walkLogId));
         return new ResponseEntity<>(detailResponse, HttpStatus.OK);
     }
+    @GetMapping
+    public ResponseEntity getWalkLogs(@Valid @ModelAttribute WalkLogControllerDTO.GetFeedRequest getFeedRequest){
+        WalkLogServiceDTO.FindFeedInput findFeedInput =
+                walkLogMapper.walkLogControllerGetMemberRequestDTOtoWalkLogServiceFindFeedInputDTO(getFeedRequest);
+        Page<WalkLogControllerDTO.GetFeedResponse> responses = walkLogService.findFeedWalkLogs(findFeedInput)
+                .map(walkLogMapper::walkLogServiceFindFeedOutputDTOtoWalkLogControllerGetFeedResponseDTO);
+
+        return new ResponseEntity<>(new MultiResponseDto<>(responses.getContent(),responses), HttpStatus.OK);    }
 
     @DeleteMapping("/{walk-log-id}")
     public ResponseEntity deleteWalkLog(@PathVariable("walk-log-id") @Positive long walkLogId){

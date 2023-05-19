@@ -1,13 +1,13 @@
 package backend.section6mainproject.member.controller;
 
 import backend.section6mainproject.advice.StompExceptionAdvice;
-import backend.section6mainproject.content.WalkLogContentStubData;
 import backend.section6mainproject.member.MemberStubData;
 import backend.section6mainproject.member.dto.MemberControllerDTO;
 import backend.section6mainproject.member.dto.MemberServiceDTO;
 import backend.section6mainproject.member.mapper.MemberMapper;
 import backend.section6mainproject.member.service.MemberService;
-import backend.section6mainproject.util.ApiDocumentUtils;
+import backend.section6mainproject.walklog.dto.WalkLogControllerDTO;
+import backend.section6mainproject.walklog.dto.WalkLogServiceDTO;
 import backend.section6mainproject.walklog.entity.WalkLog;
 import backend.section6mainproject.walklog.mapper.WalkLogMapper;
 import backend.section6mainproject.walklog.service.WalkLogService;
@@ -18,31 +18,28 @@ import org.mockito.Mockito;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockPart;
 import org.springframework.restdocs.generate.RestDocumentationGenerator;
-import org.springframework.restdocs.mockmvc.MockMvcRestDocumentation;
 import org.springframework.restdocs.payload.JsonFieldType;
-import org.springframework.restdocs.payload.PayloadDocumentation;
-import org.springframework.restdocs.request.RequestDocumentation;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import static backend.section6mainproject.util.ApiDocumentUtils.*;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.*;
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
@@ -244,6 +241,89 @@ public class MemberControllerTest {
                                 fieldWithPath("createdAt").type(JsonFieldType.STRING).description("회원 생성 시각")
                         )
                 ));
+    }
+    @Test
+    void getMyWalkLogsTest() throws Exception {
+        //given
+        Long memberId = 1L;
+        WalkLogControllerDTO.GetMemberRequest getMemberRequest = createWalkLogControllerDTOgetRequests();
+        WalkLogServiceDTO.FindInput findInput = createWalkLogServiceDTOfindsInput();
+        WalkLogControllerDTO.Response response = new WalkLogControllerDTO.Response();
+        ArrayList<WalkLogServiceDTO.FindOutput> findOutputs = new ArrayList<>();
+        WalkLogServiceDTO.FindOutput findOutput = new WalkLogServiceDTO.FindOutput();
+        findOutputs.add(findOutput);
+        findOutputs.add(findOutput);
+        response.setWalkLogId(1L);
+        response.setMessage("메세지");
+
+        given(walkLogMapper.walkLogControllerGetRequestDTOtoWalkLogServiceFindInputDTO(Mockito.any(WalkLogControllerDTO.GetMemberRequest.class)))
+                .willReturn(findInput);
+        given(walkLogService.findMyWalkLogs(Mockito.any(WalkLogServiceDTO.FindInput.class)))
+                .willReturn(new PageImpl<>(findOutputs));
+        given(walkLogMapper.walkLogServiceFindOutputDTOtoWalkLogControllerResponseDTO(Mockito.any(WalkLogServiceDTO.FindOutput.class)))
+                .willReturn(response);
+        //when
+        ResultActions perform = mockMvc.perform(
+                get("/members/"+memberId+"/walk-logs")
+                        .param("page",String.valueOf(getMemberRequest.getPage()))
+                        .param("size",String.valueOf(getMemberRequest.getSize()))
+                        .param("year",String.valueOf(getMemberRequest.getYear()))
+                        .param("month",String.valueOf(getMemberRequest.getMonth()))
+                        .param("day",String.valueOf(getMemberRequest.getDay())));
+                //then
+        perform.andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.size()").value(findOutputs.size()))
+        .andExpect(jsonPath("$.data[0].walkLogId").value(response.getWalkLogId()))
+        .andExpect(jsonPath("$.data[0].message").value(response.getMessage()));
+    }
+
+    private static WalkLogControllerDTO.GetMemberRequest createWalkLogControllerDTOgetRequests() {
+        WalkLogControllerDTO.GetMemberRequest getMemberRequest = new WalkLogControllerDTO.GetMemberRequest();
+        getMemberRequest.setSize(3);
+        getMemberRequest.setPage(1);
+        getMemberRequest.setYear(LocalDateTime.now().getYear());
+        getMemberRequest.setMonth(LocalDateTime.now().getMonthValue());
+        getMemberRequest.setDay(LocalDateTime.now().getDayOfMonth());
+        return getMemberRequest;
+    }
+    private static WalkLogServiceDTO.FindInput createWalkLogServiceDTOfindsInput() {
+        WalkLogServiceDTO.FindInput findInput = new WalkLogServiceDTO.FindInput();
+        findInput.setSize(1);
+        findInput.setPage(3);
+        findInput.setYear(LocalDateTime.now().getYear());
+        findInput.setMonth(LocalDateTime.now().getMonthValue());
+        findInput.setDay(LocalDateTime.now().getDayOfMonth());
+        return findInput;
+    }
+
+    @Test
+    void getMyWalkLogsForCalendarTest() throws Exception {
+        Long memberId = 1L;
+        WalkLogControllerDTO.GetCalendarRequest request = new WalkLogControllerDTO.GetCalendarRequest();
+        request.setYear(LocalDateTime.now().getYear());
+        request.setMonth(LocalDateTime.now().getMonthValue());
+        WalkLogControllerDTO.CalendarResponse calendarResponse = new WalkLogControllerDTO.CalendarResponse();
+        calendarResponse.setWalkLogId(1L);
+        WalkLogControllerDTO.CalendarResponse calendarResponse2 = new WalkLogControllerDTO.CalendarResponse();
+        calendarResponse2.setWalkLogId(2L);
+        List<WalkLogControllerDTO.CalendarResponse> calendarResponses = new ArrayList<>();
+        calendarResponses.add(calendarResponse);
+        calendarResponses.add(calendarResponse2);
+        given(walkLogMapper.walkLogControllerGetCalenderRequestDTOtoWalkLogServiceCalenderFindInputDTO(Mockito.any(WalkLogControllerDTO.GetCalendarRequest.class)))
+                .willReturn(new WalkLogServiceDTO.CalenderFindInput());
+        given(walkLogService.findMyMonthWalkLogs(Mockito.any(WalkLogServiceDTO.CalenderFindInput.class)))
+                .willReturn(new ArrayList<>());
+        given(walkLogMapper.WalkLogServiceCalenderFindOutputDTOsToWalkLogControllerCalendarResponseDTOs(Mockito.anyList()))
+                .willReturn(calendarResponses);
+        ResultActions perform = mockMvc.perform(
+                get("/members/"+memberId+"/walk-logs/calendar")
+                        .param("year",String.valueOf(request.getYear()))
+                        .param("month",String.valueOf(request.getMonth())));
+        perform.andExpect(status().isOk())
+                .andExpect(jsonPath("$.size()").value(calendarResponses.size()))
+                .andExpect(jsonPath("$[0].walkLogId").value(calendarResponse.getWalkLogId()))
+                .andExpect(jsonPath("$[1].walkLogId").value(calendarResponse2.getWalkLogId()));
+
     }
 
     @Test
