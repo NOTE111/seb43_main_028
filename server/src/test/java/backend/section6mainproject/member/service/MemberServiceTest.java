@@ -16,12 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import backend.section6mainproject.exception.BusinessLogicException;
 import backend.section6mainproject.walklog.entity.WalkLog;
 import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Optional;
 
@@ -127,19 +125,17 @@ public class MemberServiceTest {
         verify(memberRepository, times(1)).save(priorMember);
     }
 
+
     @Test
     void deleteMemberTest() throws Exception {
 
         Member member = stubData.getMember();
         when(memberRepository.findById(Mockito.anyLong())).thenReturn(Optional.of(member));
-        given(memberRepository.save(Mockito.any(Member.class))).willReturn(member);
 
         memberService.deleteMember(member.getMemberId());
 
-        verify(memberRepository, times(1)).save(Mockito.any(Member.class));
+        verify(memberRepository, times(1)).delete(Mockito.any(Member.class));
     }
-
-
 
     @Test
     void findRecordingWalkLog() {
